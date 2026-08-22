@@ -319,8 +319,8 @@ def testDiffInNewWindow(tempDir, mainWindow, closeKey):
     rw = mainWindow.openRepo(wd)
     assert mainWindow in QApplication.topLevelWidgets()
 
-    oid = Oid(hex='1203b03dc816ccbb67773f28b3c19318654b0bc8')
-    rw.jump(NavLocator.inCommit(oid, "c/c2.txt"), check=True)
+    oid = Oid(hex="49322bb17d3acc9146f98c97d078513228bbf3c0")
+    rw.jump(NavLocator.inCommit(oid, "a/a1"), check=True)
 
     triggerContextMenuAction(rw.committedFiles.viewport(), "open diff in new window")
     QTest.qWait(0)
@@ -329,13 +329,22 @@ def testDiffInNewWindow(tempDir, mainWindow, closeKey):
     diffWidget = diffWindow.findChild(DiffView)
     assert diffWindow is not mainWindow
     assert diffWindow is diffWidget.window()
-    assert "c2.txt" in diffWindow.windowTitle()
+    assert "a1" in diffWindow.windowTitle()
     waitUntilTrue(diffWindow.isActiveWindow)
     assert not mainWindow.isActiveWindow()
 
     # Initiate search
     QTest.keySequence(diffWidget, QKeySequence.StandardKey.Find)
     waitUntilTrue(diffWidget.searchBar.isVisible)
+
+    # Make sure we can run tasks from the detached window
+    assert readTextFile(f"{wd}/a/a1").strip() == "a1"
+    triggerContextMenuAction(diffWidget.viewport(), "revert hunk")
+    acceptQMessageBox(rw, "do you want to revert this hunk")
+    assert readTextFile(f"{wd}/a/a1").strip() == ""
+    # Bring the diff window back to the foreground before continuing the test
+    diffWindow.activateWindow()
+    waitUntilTrue(diffWindow.isActiveWindow)
 
     # Make sure the diff is closed when the repowidget is gone
     if not closeKey:

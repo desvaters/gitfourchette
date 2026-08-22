@@ -13,6 +13,9 @@ from gitfourchette.codeview.codeview import CodeView
 from gitfourchette.qt import *
 from gitfourchette.syntax import LexJobCache, LexerCache, LexJob
 
+if TYPE_CHECKING:
+    from gitfourchette.tasks import RepoTaskRunner
+
 
 class CodeWindow(QWidget):
     """
@@ -23,6 +26,10 @@ class CodeWindow(QWidget):
     """Currently open CodeWindows. Wayland's quirks force us to use a None
     parent, so we must keep track of the window so it doesn't get garbage
     collected instantly."""
+
+    codeView: CodeView
+    uniqueIdentifier: Any
+    taskRunner: RepoTaskRunner | None
 
     def __init__(
             self,
@@ -54,10 +61,10 @@ class CodeWindow(QWidget):
 
         self.codeView = codeView
         self.uniqueIdentifier = uniqueIdentifier
+        self.taskRunner = None
 
     def setPlainText(self, text: str, path: str):
         self.codeView.setPlainText(text)
-        self.codeText = text
 
         lexJob = self._getLexJob(text, path)
         if lexJob is not None:

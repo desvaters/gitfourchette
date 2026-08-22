@@ -455,10 +455,14 @@ class LoadPatchInNewWindow(RepoTask):
         diff = diffWindow.codeView
         assert isinstance(diff, DiffView)
         diff.replaceDocument(self.repo, delta, locator, diffDocument)
-        diffWindow.show()
 
+        # Let detached window run tasks on RepoWidget.taskRunner
+        diffWindow.taskRunner = self.rw.taskRunner
+
+        # Kill detached window when RepoWidget is gone
         self.rw.aboutToDelete.connect(diffWindow.close)
 
+        diffWindow.show()
 
 class DownloadLfsObjects(RepoTask):
     def flow(self, errors: LfsObjectCacheMissingError, informativeName: str = ""):
