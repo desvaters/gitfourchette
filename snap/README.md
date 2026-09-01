@@ -38,6 +38,7 @@ sudo snap connect gitfourchette:ssh-keys
 sudo snap connect gitfourchette:dot-git-config
 sudo snap connect gitfourchette:password-manager-service
 sudo snap connect gitfourchette:removable-media
+sudo snap connect gitfourchette:mount-observe
 ```
 
 ## Known limitations
@@ -76,6 +77,17 @@ agent's socket), and the socket even passes `os.path.exists()` -- only
 "(not detected)", and `askpassdialog.py` believes an agent is available. With
 `ownSshAgent` defaulting to false, a fresh install silently picks an agent it
 can't talk to. A reliable probe has to actually connect to the socket.
+
+Without the `mount-observe` interface, GIO fails to read `/proc/self/mountinfo`
+on startup and logs a warning. Nothing seems to depend on it, but connecting the
+interface silences it -- verified by comparing runs with and without.
+
+Git **credential helpers are host binaries** and therefore unavailable. A
+`~/.gitconfig` pointing `credential.helper` at the GitHub CLI fails inside the
+snap with `/usr/bin/gh: not found`, and the same goes for
+`git-credential-manager`, `libsecret` and friends. This degrades rather than
+hard-fails -- git falls back to GitFourchette's askpass, which does work in the
+sandbox -- but it means entering a token on every HTTPS operation.
 
 ## Why PyQt6 comes from PyPI
 

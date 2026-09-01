@@ -65,6 +65,7 @@ apps:
       - network-bind            # ssh-agent
       - ssh-keys                # ~/.ssh (manual connection required)
       - password-manager-service  # git credential helpers via the Secret Service
+      - mount-observe           # GIO reads /proc/self/mountinfo on startup
       - dot-git-config
 
 plugs:
