@@ -54,6 +54,18 @@ level of `$HOME`, hence the `personal-files` plug for `~/.gitconfig` and
 `~/.config/git`. `personal-files` is a super-privileged interface: publishing to
 the Snap Store with it requires a manual review by Canonical.
 
+snapd points `$HOME` at the snap's private `$SNAP_USER_DATA`, so git and ssh
+would look for `~/.gitconfig`, `~/.ssh/config` and `~/.ssh/known_hosts` in the
+wrong place. This recipe sets `HOME` back to `$SNAP_REAL_HOME`. GitFourchette's
+own preferences are unaffected, as they follow `XDG_CONFIG_HOME`, which snapd
+keeps pointing inside the snap.
+
+The host's **ssh-agent is out of reach**: its socket isn't covered by any
+interface, and ssh inside the snap fails with
+`ssh_get_authentication_socket: Permission denied`. Repositories using SSH
+remotes therefore need GitFourchette's own ssh-agent (the `ownSshAgent`
+preference) rather than the session agent.
+
 ## Why PyQt6 comes from PyPI
 
 The KDE neon extensions state outright that they "don't provide the bindings
