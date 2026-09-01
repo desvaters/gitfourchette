@@ -1,0 +1,121 @@
+# -----------------------------------------------------------------------------
+# Snap recipe for GitFourchette.
+# See snap/README.md for build instructions and known limitations.
+#
+# Note: snapcraft insists on finding its recipe in ./snap, ./build-aux/snap
+# or the project root, so this doesn't live in ./pkg like the other packaging
+# boilerplate.
+# -----------------------------------------------------------------------------
+
+name: gitfourchette
+adopt-info: gitfourchette  # picks up the version from APP_VERSION (see override-build)
+summary: The comfortable Git UI
+description: |
+  Explore your repos easily. Craft commits intuitively. GitFourchette will
+  become your new home to get work done in your Git repositories.
+
+  - A comfortable way to explore and understand your Git repositories
+  - Powerful tools to stage code, create commits, and manage branches
+  - Snappy and intuitive Qt UI designed to fit in snugly with KDE Plasma
+
+license: GPL-3.0-or-later
+website: https://gitfourchette.org
+issues: https://github.com/jorio/gitfourchette/issues
+source-code: https://github.com/jorio/gitfourchette
+icon: snap/gui/gitfourchette.png
+
+base: core24
+grade: stable
+
+# Strict confinement can't launch programs on the host (no flatpak-spawn
+# equivalent), so external editors/terminals/difftools won't work here.
+# This build is meant to establish how much of GitFourchette *does* work
+# under strict confinement before we consider asking for classic.
+confinement: strict
+
+platforms:
+  amd64:
+  arm64:
+
+apps:
+  gitfourchette:
+    command: bin/gitfourchette
+    common-id: org.gitfourchette.gitfourchette
+    extensions: [gnome]  # Mesa, fonts, themes, portals, desktop/wayland/x11 plugs
+    environment:
+      # git is bundled (see the "git" part below); it's built for /usr, so it
+      # needs to be told where its helper binaries and data live inside the snap.
+      GIT_EXEC_PATH: $SNAP/usr/lib/git-core
+      GIT_TEMPLATE_DIR: $SNAP/usr/share/git-core/templates
+      GIT_SSL_CAINFO: $SNAP/etc/ssl/certs/ca-certificates.crt
+      SSL_CERT_FILE: $SNAP/etc/ssl/certs/ca-certificates.crt
+    plugs:
+      - home                    # repos below $HOME (excluding top-level dotfiles!)
+      - removable-media         # repos on external drives
+      - network                 # fetch/push
+      - network-bind            # ssh-agent
+      - ssh-keys                # ~/.ssh (manual connection required)
+      - password-manager-service  # git credential helpers via the Secret Service
+      - dot-git-config
+
+plugs:
+  # The "home" interface deliberately excludes top-level dotfiles, so ~/.gitconfig
+  # would be invisible without this. personal-files is a super-privileged interface:
+  # publishing to the store with it requires a manual review by Canonical.
+  dot-git-config:
+    interface: personal-files
+    write:
+      - $HOME/.gitconfig
+      - $HOME/.config/git
+
+parts:
+  gitfourchette:
+    plugin: python
+    source: .
+    source-type: local
+    python-packages:
+      - pip
+      - setuptools
+      - wheel
+      # The KDE extensions don't ship Python Qt bindings, so take PyQt6 from
+      # PyPI: those wheels bundle their own Qt 6, which keeps us independent
+      # of whatever Qt the base or a content snap happens to provide.
+      - pyqt6
+    build-packages:
+      - python3-dev
+    stage-packages:
+      # Runtime libraries the PyQt6 wheels dlopen and don't bundle themselves.
+      - libxcb-cursor0
+      - libxcb-icccm4
+      - libxcb-image0
+      - libxcb-keysyms1
+      - libxcb-randr0
+      - libxcb-render-util0
+      - libxcb-shape0
+      - libxcb-xkb1
+      - libxkbcommon-x11-0
+      - libdbus-1-3
+      - libfontconfig1
+    override-build: |
+      craftctl default
+      craftctl set version="$(sed -n 's/^APP_VERSION = "\(.*\)"/\1/p' gitfourchette/appconsts.py)"
+
+  git:
+    # Not optional here: unlike the Flatpak, a strictly confined snap has no way
+    # to reach the host's git, so it has to come along for the ride.
+    plugin: nil
+    stage-packages:
+      - git
+      - git-lfs
+      - openssh-client
+      - ca-certificates
+
+  cleanup:
+    after: [gitfourchette, git]
+    plugin: nil
+    override-prime: |
+      set -eux
+      # Drop the parts of the Qt wheels we know we don't ship a UI for.
+      find "$CRAFT_PRIME" -type d -name '__pycache__' -prune -exec rm -rf {} +
+      rm -rf "$CRAFT_PRIME"/lib/python*/site-packages/PyQt6/Qt6/qml
+      rm -rf "$CRAFT_PRIME"/lib/python*/site-packages/PyQt6/Qt6/translations/qtwebengine*

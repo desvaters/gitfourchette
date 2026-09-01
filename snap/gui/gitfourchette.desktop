@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=GitFourchette
+Comment=The comfortable Git UI
+Comment[fr]=L’interface Git tout confort
+Exec=gitfourchette %F
+Icon=${SNAP}/meta/gui/gitfourchette.png
+StartupNotify=true
+Type=Application
+Categories=Development;RevisionControl;
+Keywords=git;

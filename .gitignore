@@ -7,6 +7,12 @@ gitfourchette.egg-info/
 venv/
 .venv/
 
+# Snapcraft build artifacts
+/parts/
+/stage/
+/prime/
+/*.snap
+
 # Automatically-generated wrappers for python helper scripts in unit tests
 test/data/windows_wrappers.tmp/
 
