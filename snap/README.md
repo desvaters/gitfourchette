@@ -64,7 +64,18 @@ The host's **ssh-agent is out of reach**: its socket isn't covered by any
 interface, and ssh inside the snap fails with
 `ssh_get_authentication_socket: Permission denied`. Repositories using SSH
 remotes therefore need GitFourchette's own ssh-agent (the `ownSshAgent`
-preference) rather than the session agent.
+preference) rather than the session agent. That path does work here:
+`ssh-agent` and `ssh-add` come with `openssh-client`, the agent starts, its
+socket lands in the snap's private `/tmp`, and the keys in `~/.ssh` are
+readable through the `ssh-keys` interface.
+
+Watch out, though: **both of the app's checks for a system ssh-agent report a
+false positive inside the snap.** `SSH_AUTH_SOCK` is set (to the session
+agent's socket), and the socket even passes `os.path.exists()` -- only
+`connect()` fails, with `PermissionError`. So `trtables.py` won't append
+"(not detected)", and `askpassdialog.py` believes an agent is available. With
+`ownSshAgent` defaulting to false, a fresh install silently picks an agent it
+can't talk to. A reliable probe has to actually connect to the socket.
 
 ## Why PyQt6 comes from PyPI
 
