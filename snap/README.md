@@ -54,6 +54,26 @@ level of `$HOME`, hence the `personal-files` plug for `~/.gitconfig` and
 `~/.config/git`. `personal-files` is a super-privileged interface: publishing to
 the Snap Store with it requires a manual review by Canonical.
 
+## Why PyQt6 comes from PyPI
+
+The KDE neon extensions state outright that they "don't provide the bindings
+needed for PySide2 (Qt for Python) or PyQt apps", so the Qt bindings have to
+come from somewhere else. Third-party content snaps were considered and
+rejected:
+
+- There is no PyQt6 runtime content snap for core24. `pyqt6-runtime-core24`
+  doesn't exist; `qt6-core24` ships Qt6 without any PyQt bindings; KDE only
+  publishes `kde-pyside6-core24-sdk`, which is build-time only.
+- Content interfaces only auto-connect between snaps from the same publisher.
+  Consuming someone else's runtime would require yet another manual store
+  review to get a snap declaration for cross-publisher auto-connection --
+  on top of the one `personal-files` already needs.
+- Content providers make no compatibility promises to consumers from other
+  publishers.
+
+The PyPI wheels cost roughly 95 MB before squashfs compression. That's the
+price of not depending on a stranger's runtime.
+
 ## Debugging
 
 Get a shell inside the snap's confined environment:
