@@ -126,8 +126,8 @@ parts:
       - -usr/lib/*/qt6/plugins
 
   qt-plugins:
-    # Same packages as the qt part, but only the plugins, and NOT patched by
-    # snapcraft.
+    # The plugin half of the qt part's packages, plus qt6-svg-plugins, and NOT
+    # patched by snapcraft.
     #
     # snapcraft 9.0.1 bundles patchelf 0.9 (2016). Qt 6.2 and later store a
     # plugin's metadata in an ELF note and locate it by walking the PT_NOTE
@@ -155,6 +155,13 @@ parts:
       - python3-pyqt6.qtsvg
       - kde-style-breeze
       - qt6-wayland
+      # Ships imageformats/libqsvg.so and iconengines/libqsvgicon.so, which
+      # nothing else pulls in: python3-pyqt6.qtsvg and libqt6svg6 give the
+      # bindings and the library, but not the plugins that let QImage and
+      # QIcon read an SVG at all. Without it the app's SVG icons and SVG diffs
+      # come up blank -- test_diff.py::testDiffSvgImage and
+      # test_iconbank.py::testStockIconImgTagDpr catch exactly that.
+      - qt6-svg-plugins
     stage:
       - usr/lib/*/qt6/plugins
     override-prime: |

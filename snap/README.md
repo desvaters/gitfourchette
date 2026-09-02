@@ -146,6 +146,28 @@ a distribution.
   against a private repository succeeds without prompting, i.e. the host
   credential helper is actually used, not just present.
 - The bundled git (2.53.0) wins on `PATH` and reads the real `~/.gitconfig`.
+- The test suite passes: 948 passed, 10 skipped, 0 failed. All ten skips are
+  the suite's own opt-in gates (six need `--with-network`, three `--with-fuse`,
+  one is flatpak-specific), so nothing is skipped because of the snap.
+
+## Running the test suite inside the snap
+
+The snap packages the app, not the tests, and it is read-only, so the test
+dependencies have to live outside it and come in over `PYTHONPATH`:
+
+```
+snap run --shell gitfourchette
+python3 -m pip install --target=/tmp/testdeps pytest pytest-qt pytest-xdist
+PYTHONPATH=/tmp/testdeps:$SNAP/usr/lib/python3/dist-packages \
+  python3 /path/to/gitfourchette/test.py
+```
+
+This runs the checkout's tests against the *snap's* interpreter, Qt and
+pygit2, which is the combination worth checking. `test.py` sets
+`QT_QPA_PLATFORM=offscreen` itself, and the offscreen plugin is staged.
+
+Everything the suite needs at runtime is already in the snap: pygit2 comes
+with the app, and `PyQt6.QtTest` with `python3-pyqt6`.
 
 ## Cost of strict confinement
 
