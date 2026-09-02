@@ -116,8 +116,13 @@ Both halves are needed. Plugins that snapcraft never touched are recognised
 again, but they cannot *load* without an RPATH, because `libQt6XcbQpa.so.6` and
 friends exist only inside the snap.
 
-This is worth reporting to Canonical: it hits any snap staging Qt 6 plugins from
-a distribution.
+Reported upstream as
+[canonical/snapcraft#6410](https://github.com/canonical/snapcraft/issues/6410),
+since it hits any snap staging Qt 6 plugins from a distribution. That report
+carries a minimal reproducer and the upstream patchelf fixes it needs
+(0.12 for PT_NOTE relocation in general, 0.16.0 for the `.dynstr` growth that
+triggers it here). Drop the `qt-plugins` part once snapcraft's bundled patchelf
+is new enough.
 
 ## Fixed along the way
 
