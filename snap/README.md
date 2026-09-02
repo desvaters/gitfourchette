@@ -81,56 +81,43 @@ Third-party content snaps were considered and rejected:
 - Content providers make no compatibility promises to consumers from other
   publishers.
 
-## The Qt plugin blocker, and what it actually was
+## Why the Qt plugins are staged separately
 
-For a long stretch this recipe produced a snap that packed, installed and
-staged everything, and then died at Qt initialisation:
+**snapcraft 9.0.1 bundles patchelf 0.9**, which predates Qt 6's note-based
+plugin metadata by five years. Qt 6.2 and later keep a plugin's metadata in an
+ELF note and locate it by walking the PT_NOTE program headers. When patchelf 0.9
+grows `.dynstr` to make room for an RPATH it relocates `.note.qt.metadata` to the
+end of the file without extending PT_NOTE coverage, so the note survives in the
+file but sits in a LOAD segment where Qt never looks:
+
+    pristine (.deb)   05   .note.qt.metadata                     <- PT_NOTE
+    after patchelf    13   .dynamic .dynstr .note.qt.metadata    <- LOAD
+
+Qt then rejects every plugin with `'libqxcb.so' is not a Qt plugin (metadata not
+found)`, which leaves the app with no platform plugin and no Breeze style.
+
+Two things make this hard to recognise. The failure surfaces as
 
     qt.qpa.plugin: Could not find the Qt platform plugin "wayland" in ""
-    qt.qpa.plugin: Could not find the Qt platform plugin "xcb" in ""
 
-**The empty `""` is a red herring.** It is not the plugin search path -- it is
-`QT_QPA_PLATFORM_PLUGIN_PATH`, which is unset here and normally is. Running with
-`QT_DEBUG_PLUGINS=1` shows Qt searching exactly the right directory and
-rejecting every file it finds:
-
-    checking directory path ".../qt6/plugins/platforms" ...
-    looking at "libqxcb.so"
-      ... 'libqxcb.so' is not a Qt plugin (metadata not found)
-
-**The cause is patchelf 0.9, which snapcraft 9.0.1 bundles.** Qt 6.2 and later
-keep a plugin's metadata in an ELF note and find it by walking the PT_NOTE
-program headers. When patchelf 0.9 grows `.dynstr` to make room for an RPATH it
-relocates `.note.qt.metadata` to the end of the file and does not extend PT_NOTE
-coverage to the new location, so the note survives in the file but sits in a
-LOAD segment where Qt never looks. Compare a staged plugin with the one from the
-`.deb` it came from:
-
-    pristine   05     .note.qt.metadata          <- a PT_NOTE segment
-    staged     13     .dynamic .dynstr .note.qt.metadata   <- a LOAD segment
+and that empty `""` is **not** the plugin search path -- it is
+`QT_QPA_PLATFORM_PLUGIN_PATH`, which is unset here and normally is.
+`QT_DEBUG_PLUGINS=1` shows Qt searching the correct directory all along and
+rejecting what it finds there. And the damage is not repairable after the fact:
+running a newer patchelf over an already-mangled plugin does not restore the
+coverage.
 
 patchelf 0.18 from the distribution handles this correctly, with every flag
-combination snapcraft uses (`--no-default-lib --force-rpath --set-rpath`). So it
-is the version, not the invocation. The damage is also not repairable after the
-fact: running 0.18 over an already-mangled plugin does not restore the coverage.
+combination snapcraft uses (`--no-default-lib --force-rpath --set-rpath`), so it
+is the version and not the invocation. Hence the `qt-plugins` part: it stages
+the plugin tree out of snapcraft's patchelf pass and sets the RPATH itself.
 
-**Both halves of the fix are needed**, verified separately inside the installed
-snap:
+Both halves are needed. Plugins that snapcraft never touched are recognised
+again, but they cannot *load* without an RPATH, because `libQt6XcbQpa.so.6` and
+friends exist only inside the snap.
 
-- Plugins that snapcraft's patchelf never touched are recognised again -- Qt
-  reports "Available platform plugins are: xcb, vkkhrdisplay, offscreen,
-  minimal, linuxfb, vnc" instead of finding nothing.
-- But they then fail to *load*, because without an RPATH they cannot find
-  `libQt6XcbQpa.so.6` and friends, which exist only inside the snap.
-
-Hence the `qt-plugins` part: it stages the plugin tree out of snapcraft's
-patchelf pass and sets the RPATH itself using patchelf 0.18. With a plugin
-prepared that way, and no `LD_LIBRARY_PATH` anywhere, the app starts and the
-staged `libqxcb.so` shows up in `/proc/<pid>/maps`.
-
-This is worth reporting to Canonical: patchelf 0.9 predates Qt 6's note-based
-plugin metadata by five years, and any snap staging Qt 6 plugins from a
-distribution hits it.
+This is worth reporting to Canonical: it hits any snap staging Qt 6 plugins from
+a distribution.
 
 ## Fixed along the way
 
@@ -139,9 +126,9 @@ distribution hits it.
   venv's, and the app couldn't import its own package.
 - **QtSvg.** The distribution splits PyQt6 up per Qt module, so
   `python3-pyqt6.qtsvg` needs staging separately.
-- **Library resolution.** Adding `override-prime` to the `qt` part silently
-  suppressed snapcraft's patchelf pass, and every staged Qt library stopped
-  resolving. `qt.conf` is generated from a separate part for that reason.
+- **Library resolution.** Adding `override-prime` to a part silently suppresses
+  snapcraft's patchelf pass for it. That is a trap when staging Qt, but it is
+  also exactly what the `qt-plugins` part needs, which does its own patching.
 - **venv creation.** Once the `python` part is staged, its interpreter shadows
   the build environment's on `PATH`, so it needs `python3-venv` staged too.
   `PARTS_PYTHON_INTERPRETER` can't work around this: the plugin concatenates it
