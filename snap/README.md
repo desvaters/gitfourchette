@@ -149,6 +149,45 @@ a distribution.
 - The test suite passes: 948 passed, 10 skipped, 0 failed. All ten skips are
   the suite's own opt-in gates (six need `--with-network`, three `--with-fuse`,
   one is flatpak-specific), so nothing is skipped because of the snap.
+- `test.py --with-network` passes too: HTTPS against real remotes works.
+
+## Known limitation: FUSE mounts do not work inside the snap
+
+"Mount commit as folder" is present and starts its helper process, but the
+mount never appears. `test.py --with-fuse` fails on all three `test_mount.py`
+tests for that reason.
+
+The snap has everything it needs -- `mfusepy` is installed, `libfuse3` is
+staged and loads, `/dev/fuse` opens, the host's setuid `fusermount3` is
+reachable and runs. What fails is the handover between them. libfuse creates a
+socketpair, passes the descriptor number in `_FUSE_COMMFD` and execs
+`fusermount3`; inside the snap that descriptor is gone by the time the helper
+looks at it:
+
+    fstat(4, ...) = -1 EBADF (Bad file descriptor)
+    fusermount3: file descriptor 4 is not a socket, can't send fuse fd
+
+(The helper's message is misleading -- the descriptor is not of the wrong type,
+it is closed.) The descriptor is valid and explicitly non-close-on-exec in the
+parent right up to the `execve`, and the same code mounts fine outside the
+snap.
+
+Measured both ways, so neither the library version nor this app is involved:
+
+|          | libfuse2 | libfuse3 |
+|----------|----------|----------|
+| **host** | mounts   | mounts   |
+| **snap** | EBADF    | EBADF    |
+
+A twenty-line hello-world FUSE filesystem reproduces it, so GitFourchette's
+code plays no part. Why `execve` loses the descriptor under `snap run` is a
+question for snapd, not for this recipe.
+
+`mfusepy` and `libfuse3` are staged anyway: they are the right dependencies,
+they fix the two layers that *were* the recipe's fault (the feature used to be
+missing from the menu entirely, then failed to find libfuse), and the feature
+works the moment the handover does. Whether to ship a menu entry that cannot
+succeed is upstream's call.
 
 ## Running the test suite inside the snap
 
